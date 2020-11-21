@@ -1,20 +1,66 @@
-import express from 'express'
-import { Request, Response }  from 'express';
-import cors from 'cors';
-import bodyParser from 'body-parser'
-import { data } from './models/modbus/payload-data'
+import * as dotenv from "dotenv";
 
-// Create a new express app instance
-const app: express.Application = express();
-app.use(express.urlencoded({extended: true}));
-app.use(bodyParser.json());
-app.use(cors({origin: true, credentials: true}));
+import jsmodbus from "jsmodbus";
+import net from "net";
 
+import { interval, Subscription } from "rxjs";
 
-app.get("/", (req: any, res: any) =>  {
-  res.send(data);
-});
+import { dataUponChange, timeChangeData } from "./models/modbus/payload-data";
+import { ModbusPayload } from "./models/modbus/modbus-payload";
+import { ModbusVariableMapper } from "./models/modbus/modbus-variable-mapper";
 
-app.listen(process.env.PORT || 8080, () => {
-  console.log("App is listening on port 8080!");
-});
+dotenv.config();
+
+const variableMapper = new ModbusVariableMapper();
+
+const socket = new net.Socket();
+const unitID: number = 1;
+const client = new jsmodbus.client.TCP(socket, unitID);
+const options: net.SocketConnectOpts = {
+  host: process.env.HOST,
+  port: parseInt(process.env.MODBUS_PORT),
+};
+
+let interval_$: Subscription;
+
+function main() {
+  try {
+    socket.on("connect", () => {
+      console.log("CONNECTED");
+
+      interval_$ = interval(5000).subscribe(() => {
+        sendOnlyChangedData();
+      });
+    });
+
+    socket.connect(options);
+  } catch (error) {
+    console.log(error);
+    interval_$.unsubscribe();
+  }
+}
+
+async function sendOnlyChangedData(): Promise<void> {
+  const variablesToSendToCloud: any[] = [];
+
+  for (let i = 0; i < dataUponChange.length; i++) {
+    const payload: ModbusPayload = dataUponChange[i];
+    const registerData = await client.readHoldingRegisters(payload.address, 1);
+
+    const variableKey = Object.keys(payload.value)[0];
+    const previousValue = variableMapper.keys[variableKey];
+    const currentValue = registerData.response.body.values[0];
+
+    if (previousValue !== currentValue) {
+      variableMapper.keys[variableKey] = currentValue;
+      variablesToSendToCloud.push({ [variableKey]: currentValue });
+    }
+  }
+
+  console.log(variablesToSendToCloud);
+  console.log("\n");
+
+  return Promise.resolve();
+}
+
+main();
