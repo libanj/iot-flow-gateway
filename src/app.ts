@@ -8,6 +8,7 @@ import { interval, Subscription } from "rxjs";
 import { dataUponChange, timeChangeData } from "./models/modbus/payload-data";
 import { ModbusPayload } from "./models/modbus/modbus-payload";
 import { ModbusVariableMapper } from "./models/modbus/modbus-variable-mapper";
+import { sendModbusDataToUbidots } from "./ubidots-data-sender";
 
 dotenv.config();
 
@@ -26,22 +27,22 @@ let interval_$: Subscription;
 function main() {
   try {
     socket.on("connect", () => {
-      console.log("CONNECTED");
+      // console.log("CONNECTED");
 
-      interval_$ = interval(5000).subscribe(() => {
+      interval_$ = interval(parseInt(process.env.INTERVAL_TIME)).subscribe(() => {
         sendOnlyChangedData();
       });
     });
 
     socket.connect(options);
   } catch (error) {
-    console.log(error);
+    // console.log(error);
     interval_$.unsubscribe();
   }
 }
 
 async function sendOnlyChangedData(): Promise<void> {
-  const variablesToSendToCloud: any[] = [];
+  const variablesToSendToCloud: { [key: string]: number } = {};
 
   for (let i = 0; i < dataUponChange.length; i++) {
     const payload: ModbusPayload = dataUponChange[i];
@@ -53,12 +54,14 @@ async function sendOnlyChangedData(): Promise<void> {
 
     if (previousValue !== currentValue) {
       variableMapper.keys[variableKey] = currentValue;
-      variablesToSendToCloud.push({ [variableKey]: currentValue });
+      variablesToSendToCloud[variableKey] = currentValue;
     }
   }
 
-  console.log(variablesToSendToCloud);
-  console.log("\n");
+  // console.log(variablesToSendToCloud);
+  // console.log("\n");
+
+  await sendModbusDataToUbidots(variablesToSendToCloud);
 
   return Promise.resolve();
 }
