@@ -270,3 +270,5 @@ export const dataUponChange: ModbusPayload[] = [
     quantity: 1,
   },
 ];
+
+

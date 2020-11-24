@@ -17,20 +17,21 @@ export async function sendModbusDataToUbidots(modbusPayload: {
     maxRedirects: 20,
   };
 
-  // const request: any = https.request(options, (response: any) => {
-  //   const chunks: any[] = [];
+  const request: any = https.request(options, (response: any) => {
+    const chunks: any[] = [];
 
-  //   response.on("data", (chunk: any) => chunks.push(chunk));
+    response.on("data", (chunk: any) => chunks.push(chunk));
 
-  //   response.on("end", () => {
-  //     const body = Buffer.concat(chunks);
-  //     console.log(body.toString());
-  //   });
+    response.on("end", () => {
+      const body = Buffer.concat(chunks);
+			console.log(body.toString());
+			console.log("\n");
+    });
 
-	// 	response.on("error", (error: any) => console.error(error));
-	// });
+		response.on("error", (error: any) => console.error(error));
+	});
 	
-	const request: any = https.request(options);
+	// const request: any = https.request(options);
 
   await request.write(postData);
 
