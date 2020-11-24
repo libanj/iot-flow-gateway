@@ -2,7 +2,6 @@ import * as dotenv from "dotenv";
 
 import jsmodbus from "jsmodbus";
 import net from "net";
-// var CronJob = require("cron").CronJob;
 import cron from "cron";
 
 import { dataUponChange, timeChangeData } from "./models/modbus/payload-data";
