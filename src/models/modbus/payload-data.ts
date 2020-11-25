@@ -1,26 +1,24 @@
 import { ModbusPayload } from "./modbus-payload";
 
-/* TODO: Do this one manually for full bags */
-//  {
-//     value: {
-//       fullbags: 0,
-//     },
-//     fc: 3,
-//     unitid: 1,
-//     address: 5000,
-//     quantity: 1,
-//   },
+export const fullBagsData: ModbusPayload = {
+  value: {
+    fullbags: 0,
+  },
+  fc: 3,
+  unitid: 1,
+  address: 5000,
+  quantity: 1,
+};
 
-/*  TODO: Do this one manually for shift efficiency */
-//  {
-//     value: {
-//       shiftefficiency: 0,
-//     },
-//     fc: 3,
-//     unitid: 1,
-//     address: 5036,
-//     quantity: 1,
-//   },
+export const shiftEfficiencyData: ModbusPayload = {
+  value: {
+    shiftefficiency: 0,
+  },
+  fc: 3,
+  unitid: 1,
+  address: 5036,
+  quantity: 1,
+};
 
 export const timeChangeData: ModbusPayload[] = [
   {
@@ -270,5 +268,3 @@ export const dataUponChange: ModbusPayload[] = [
     quantity: 1,
   },
 ];
-
-

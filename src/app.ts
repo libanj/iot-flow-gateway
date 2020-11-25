@@ -4,7 +4,12 @@ import jsmodbus from "jsmodbus";
 import net from "net";
 import cron from "cron";
 
-import { dataUponChange, timeChangeData } from "./models/modbus/payload-data";
+import {
+  fullBagsData,
+  shiftEfficiencyData,
+  dataUponChange,
+  timeChangeData,
+} from "./models/modbus/payload-data";
 import { ModbusPayload } from "./models/modbus/modbus-payload";
 import { ModbusVariableMapper } from "./models/modbus/modbus-variable-mapper";
 import { sendModbusDataToUbidots } from "./ubidots-data-sender";
@@ -21,76 +26,47 @@ const options: net.SocketConnectOpts = {
   port: parseInt(process.env.MODBUS_PORT),
 };
 
-function main() {
+const main = (): void => {
   try {
     socket.on("connect", () => {
       console.log("CONNECTED");
 
       //EVERY 15 MINUTES
       const dataUponChangedSchedule: any = createCronJob(
-				"0 */15 * * * *",
-				() => sendOnlyChangedData(dataUponChange),
-        dataUponChange,
+        "0 */15 * * * *",
+        () => sendOnlyChangedData(dataUponChange),
         process.env.TIMEZONE
       );
       dataUponChangedSchedule.start();
 
       //STARTS 06:50AM
       const timeChangeDataScheduleAM: any = createCronJob(
-				"0 50 06 * * *",
-				() => sendData(timeChangeData),
-        timeChangeData,
+        "0 50 06 * * *",
+        () => sendData(timeChangeData),
         process.env.TIMEZONE
       );
-			timeChangeDataScheduleAM.start();
-			
+      timeChangeDataScheduleAM.start();
+
       //STARTS 06:50PM
       const timeChangeDataSchedulePM: any = createCronJob(
-				"0 50 18 * * *",
-				() => sendData(timeChangeData),
-        timeChangeData,
+        "0 50 18 * * *",
+        () => sendData(timeChangeData),
         process.env.TIMEZONE
       );
       timeChangeDataSchedulePM.start();
 
       //SEND SHIFT EFFICIENCY DATA
-      const shiftEfficiencyData: ModbusPayload[] = [
-        {
-          value: {
-            shiftefficiency: 0,
-          },
-          fc: 3,
-          unitid: 1,
-          address: 5036,
-          quantity: 1,
-        },
-      ];
-
       const shiftEfficiencySchedule: any = createCronJob(
-				"0 0 */1 * * *",
-				() => sendShiftEfficiencyData(shiftEfficiencyData),
-        shiftEfficiencyData,
+        "0 0 */1 * * *",
+        () => sendShiftEfficiencyData(),
         process.env.TIMEZONE
       );
       shiftEfficiencySchedule.start();
 
       //SEND FULL BAGS DATA
-      const fullBagsData: ModbusPayload[] = [
-        {
-          value: {
-            fullbags: 0,
-          },
-          fc: 3,
-          unitid: 1,
-          address: 5000,
-          quantity: 1,
-        },
-      ];
-
       const fullBagsSchedule: any = createCronJob(
-				"0 0 */1 * * *",
-				() => sendFullBagsData(fullBagsData),
-        fullBagsData,
+        "0 0 */1 * * *",
+        () => sendFullBagsData(),
         process.env.TIMEZONE
       );
       fullBagsSchedule.start();
@@ -100,25 +76,26 @@ function main() {
   } catch (error) {
     console.log(error);
   }
-}
+};
 
-function createCronJob(
-	cronTime: string,
-	cronFunction: (dataArray: ModbusPayload[]) => Promise<void>,
-  dataArray: ModbusPayload[],
+const createCronJob = (
+  cronTime: string,
+  cronFunction: () => Promise<void>,
   timezone: string
-): any {
+): any => {
   // setting up job schedule
   return new cron.CronJob(
     cronTime,
-    async () => cronFunction(dataArray),
+    async () => cronFunction(),
     null,
     true,
     timezone
   );
-}
+};
 
-async function sendOnlyChangedData(dataArray: ModbusPayload[]): Promise<void> {
+const sendOnlyChangedData = async (
+  dataArray: ModbusPayload[]
+): Promise<void> => {
   const variablesToSendToCloud: { [key: string]: number } = {};
 
   for (let i = 0; i < dataArray.length; i++) {
@@ -134,12 +111,12 @@ async function sendOnlyChangedData(dataArray: ModbusPayload[]): Promise<void> {
       variablesToSendToCloud[variableKey] = currentValue;
     }
   }
-	await sendModbusDataToUbidots(variablesToSendToCloud);
-	
-  return Promise.resolve();
-}
+  await sendModbusDataToUbidots(variablesToSendToCloud);
 
-async function sendData(dataArray: ModbusPayload[]): Promise<void> {
+  return Promise.resolve();
+};
+
+const sendData = async (dataArray: ModbusPayload[]): Promise<void> => {
   const variablesToSendToCloud: { [key: string]: number } = {};
 
   for (let i = 0; i < dataArray.length; i++) {
@@ -152,37 +129,35 @@ async function sendData(dataArray: ModbusPayload[]): Promise<void> {
     variableMapper.keys[variableKey] = currentValue;
     variablesToSendToCloud[variableKey] = currentValue;
   }
-	await sendModbusDataToUbidots(variablesToSendToCloud);
-	
+  await sendModbusDataToUbidots(variablesToSendToCloud);
+
   return Promise.resolve();
-}
+};
 
-async function sendFullBagsData(payload: ModbusPayload[]): Promise<void> {
-  const registerData = await client.readHoldingRegisters(payload[0].address, 1);
-
-  const previousValue: number = variableMapper.keys["fullbags"];
+const sendFullBagsData = async (): Promise<void> => {
+  const registerData = await client.readHoldingRegisters(
+    fullBagsData.address,
+    1
+  );
   const currentValue: number = registerData.response.body.values[0];
+  const previousValue: number = variableMapper.keys["fullbags"];
   let currentHourTotal: number = currentValue - previousValue;
-
-  if (currentHourTotal <= 0) {
-    currentHourTotal = currentValue;
-  }
+  if (currentHourTotal <= 0) currentHourTotal = currentValue;
 
   variableMapper.keys["fullbags"] = currentValue;
-
   await sendModbusDataToUbidots({ fullbags: currentValue });
-
   return Promise.resolve();
-}
+};
 
-async function sendShiftEfficiencyData(
-  payload: ModbusPayload[]
-): Promise<void> {
-  const registerData = await client.readHoldingRegisters(payload[0].address, 1);
+const sendShiftEfficiencyData = async (): Promise<void> => {
+  const registerData = await client.readHoldingRegisters(
+    shiftEfficiencyData.address,
+    1
+  );
   const currentValue: number = registerData.response.body.values[0];
   variableMapper.keys["shiftefficiency"] = currentValue;
-	await sendModbusDataToUbidots({ shiftefficiency: currentValue });
+  await sendModbusDataToUbidots({ shiftefficiency: currentValue });
   return Promise.resolve();
-}
+};
 
 main();

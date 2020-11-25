@@ -24,14 +24,12 @@ export async function sendModbusDataToUbidots(modbusPayload: {
 
     response.on("end", () => {
       const body = Buffer.concat(chunks);
-			console.log(body.toString());
-			console.log("\n");
+      console.log(body.toString());
+      console.log("\n");
     });
 
-		response.on("error", (error: any) => console.error(error));
-	});
-	
-	// const request: any = https.request(options);
+    response.on("error", (error: any) => console.error(error));
+  });
 
   await request.write(postData);
 
